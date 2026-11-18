@@ -1,41 +1,3 @@
-// pipeline {
-//     agent any
-
-//     stages {
-//         stage('Build') {
-//             steps {
-//                 echo 'Building...'
-//                 // Add build steps here
-//             }
-//         }
-//         stage('Test') {
-//             steps {
-//                 echo 'Testing...'
-//                 // Add test steps here
-//             }
-//         }
-//         stage('Deploy') {
-//             steps {
-//                 echo 'Deploying...'
-//                 // Add deploy steps here
-//             }
-//         }
-//     }
-
-//     post {
-//         always {
-//             echo 'This will always run after the stages.'
-//         }
-//         success {
-//             echo 'This will run only if the pipeline succeeds.'
-//         }
-//         failure {
-//             echo 'This will run only if the pipeline fails.'
-//         }
-//     }
-// }
-
-
 
 pipeline {
     agent any
@@ -60,34 +22,41 @@ pipeline {
         stage('Git Checkout') {
             steps {
                 echo 'Downloading source code from GitHub'
-
                 checkout scm
 
-                sh 'pwd'
-                sh 'ls -la'
+                sh '''
+                    echo "Workspace:"
+                    pwd
+                    echo "Repository files:"
+                    ls -la
+                '''
             }
         }
 
         stage('Check Required Files') {
             steps {
-                sh '''
-                    set -e
+                script {
+                    def filePath = sh(
+                        script: "find . -type f -name 'grafana-prometheus-updated.sh' -print -quit",
+                        returnStdout: true
+                    ).trim()
 
-                    if [ ! -f grafana-prometheus-updated.sh ]; then
-                        echo "Installation script not found!"
-                        exit 1
-                    fi
+                    if (!filePath) {
+                        error "Installation script not found in GitHub repository!"
+                    }
 
-                    echo "Installation script found successfully"
-                '''
+                    env.INSTALL_SCRIPT = filePath
+
+                    echo "Installation script found: ${env.INSTALL_SCRIPT}"
+                }
             }
         }
 
         stage('Set Permissions') {
             steps {
                 sh '''
-                    chmod +x grafana-prometheus-updated.sh
-                    ls -l grafana-prometheus-updated.sh
+                    chmod +x "$INSTALL_SCRIPT"
+                    ls -l "$INSTALL_SCRIPT"
                 '''
             }
         }
@@ -95,7 +64,7 @@ pipeline {
         stage('Validate Shell Script') {
             steps {
                 sh '''
-                    bash -n grafana-prometheus-updated.sh
+                    bash -n "$INSTALL_SCRIPT"
                     echo "Shell script syntax is valid"
                 '''
             }
@@ -106,40 +75,32 @@ pipeline {
                 echo 'Installing Prometheus, Grafana, Alertmanager and Node Exporter'
 
                 sh '''
-                    sudo bash grafana-prometheus-updated.sh
+                    sudo -n bash "$INSTALL_SCRIPT"
                 '''
             }
         }
 
         stage('Verify Prometheus') {
             steps {
-                sh '''
-                    systemctl is-active prometheus
-                '''
+                sh 'systemctl is-active prometheus'
             }
         }
 
         stage('Verify Grafana') {
             steps {
-                sh '''
-                    systemctl is-active grafana-server
-                '''
+                sh 'systemctl is-active grafana-server'
             }
         }
 
         stage('Verify Alertmanager') {
             steps {
-                sh '''
-                    systemctl is-active alertmanager
-                '''
+                sh 'systemctl is-active alertmanager'
             }
         }
 
         stage('Verify Node Exporter') {
             steps {
-                sh '''
-                    systemctl is-active node_exporter
-                '''
+                sh 'systemctl is-active node_exporter'
             }
         }
 

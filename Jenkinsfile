@@ -6,7 +6,7 @@ pipeline {
         COURSE = 'jenkins'
     }
     options {
-        timeout(time: 30, unit: 'seconds') 
+        timeout(time: 30, unit: 'MINUTES') 
         disableConcurrentBuilds()
     }
     parameters {
